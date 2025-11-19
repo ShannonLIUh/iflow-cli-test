@@ -110,15 +110,66 @@
             color: #4CAF50;
             height: 30px;
         }
+
+        .game-settings {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+
+        .game-mode {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .ai-difficulty {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        select {
+            padding: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
+
+        .thinking {
+            color: #ff9800;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
     <div class="game-container">
         <h1>五子棋游戏</h1>
         
+        <div class="game-settings">
+            <div class="game-mode">
+                <label for="game-mode">游戏模式:</label>
+                <select id="game-mode">
+                    <option value="pvp">双人对战</option>
+                    <option value="ai">人机对战</option>
+                </select>
+            </div>
+            <div class="ai-difficulty">
+                <label for="ai-difficulty">AI难度:</label>
+                <select id="ai-difficulty">
+                    <option value="easy">简单</option>
+                    <option value="medium" selected>中等</option>
+                    <option value="hard">困难</option>
+                </select>
+            </div>
+        </div>
+        
         <div class="game-info">
             <div class="current-player">当前玩家: <span id="current-player">黑子</span></div>
             <div>回合数: <span id="turn-count">0</span></div>
+            <div id="ai-thinking" class="thinking"></div>
         </div>
         
         <div class="board" id="board"></div>
@@ -137,7 +188,11 @@
                 this.currentPlayer = 'black';
                 this.gameOver = false;
                 this.turnCount = 0;
+                this.gameMode = 'pvp'; // 'pvp' 或 'ai'
+                this.aiDifficulty = 'medium'; // 'easy', 'medium', 'hard'
+                this.aiThinking = false;
                 this.initBoard();
+                this.initSettings();
             }
 
             initBoard() {
@@ -159,19 +214,30 @@
             }
 
             handleCellClick(event) {
-                if (this.gameOver) return;
+                if (this.gameOver || this.aiThinking) return;
                 
                 const row = parseInt(event.target.dataset.row);
                 const col = parseInt(event.target.dataset.col);
                 
                 if (this.board[row][col] !== null) return;
                 
+                this.makeMove(row, col);
+                
+                // 如果是AI模式且轮到AI下棋
+                if (this.gameMode === 'ai' && !this.gameOver && this.currentPlayer === 'white') {
+                    this.aiMove();
+                }
+            }
+            
+            makeMove(row, col) {
                 this.board[row][col] = this.currentPlayer;
                 this.turnCount++;
                 
+                // 更新UI
+                const cellElement = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
                 const piece = document.createElement('div');
                 piece.className = this.currentPlayer;
-                event.target.appendChild(piece);
+                cellElement.appendChild(piece);
                 
                 if (this.checkWin(row, col)) {
                     this.gameOver = true;
@@ -230,8 +296,170 @@
                 this.currentPlayer = 'black';
                 this.gameOver = false;
                 this.turnCount = 0;
+                this.aiThinking = false;
                 document.getElementById('winner-message').textContent = '';
+                document.getElementById('ai-thinking').textContent = '';
                 this.initBoard();
+            }
+            
+            initSettings() {
+                const gameModeSelect = document.getElementById('game-mode');
+                const aiDifficultySelect = document.getElementById('ai-difficulty');
+                
+                gameModeSelect.addEventListener('change', (e) => {
+                    this.gameMode = e.target.value;
+                    this.restart();
+                });
+                
+                aiDifficultySelect.addEventListener('change', (e) => {
+                    this.aiDifficulty = e.target.value;
+                });
+            }
+            
+            aiMove() {
+                this.aiThinking = true;
+                document.getElementById('ai-thinking').textContent = 'AI思考中...';
+                
+                // 使用setTimeout模拟AI思考时间
+                setTimeout(() => {
+                    const move = this.getBestMove();
+                    if (move) {
+                        this.makeMove(move.row, move.col);
+                    }
+                    this.aiThinking = false;
+                    document.getElementById('ai-thinking').textContent = '';
+                }, 500);
+            }
+            
+            getBestMove() {
+                const emptyCells = [];
+                
+                for (let row = 0; row < 15; row++) {
+                    for (let col = 0; col < 15; col++) {
+                        if (this.board[row][col] === null) {
+                            emptyCells.push({ row, col });
+                        }
+                    }
+                }
+                
+                if (emptyCells.length === 0) return null;
+                
+                // 根据难度选择不同的策略
+                switch (this.aiDifficulty) {
+                    case 'easy':
+                        return this.getRandomMove(emptyCells);
+                    case 'medium':
+                        return this.getMediumMove(emptyCells);
+                    case 'hard':
+                        return this.getHardMove(emptyCells);
+                    default:
+                        return this.getRandomMove(emptyCells);
+                }
+            }
+            
+            getRandomMove(emptyCells) {
+                return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+            }
+            
+            getMediumMove(emptyCells) {
+                // 中等难度：50%概率选择最优解，50%随机
+                if (Math.random() < 0.5) {
+                    return this.getHardMove(emptyCells);
+                } else {
+                    return this.getRandomMove(emptyCells);
+                }
+            }
+            
+            getHardMove(emptyCells) {
+                let bestMove = null;
+                let bestScore = -Infinity;
+                
+                for (const { row, col } of emptyCells) {
+                    // 检查这一步是否能赢
+                    this.board[row][col] = 'white';
+                    if (this.checkWin(row, col)) {
+                        this.board[row][col] = null;
+                        return { row, col };
+                    }
+                    this.board[row][col] = null;
+                    
+                    // 检查对手这一步是否能赢，需要防守
+                    this.board[row][col] = 'black';
+                    if (this.checkWin(row, col)) {
+                        this.board[row][col] = null;
+                        return { row, col };
+                    }
+                    this.board[row][col] = null;
+                    
+                    // 评估这一步的分数
+                    const score = this.evaluatePosition(row, col, 'white');
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMove = { row, col };
+                    }
+                }
+                
+                return bestMove || this.getRandomMove(emptyCells);
+            }
+            
+            evaluatePosition(row, col, player) {
+                let score = 0;
+                const opponent = player === 'white' ? 'black' : 'white';
+                
+                // 临时放置棋子
+                this.board[row][col] = player;
+                
+                // 评估四个方向
+                const directions = [
+                    [[0, 1], [0, -1]],  // 水平
+                    [[1, 0], [-1, 0]],  // 垂直
+                    [[1, 1], [-1, -1]], // 对角线
+                    [[1, -1], [-1, 1]]  // 反对角线
+                ];
+                
+                for (const direction of directions) {
+                    let count = 1;
+                    let openEnds = 0;
+                    
+                    for (const [dr, dc] of direction) {
+                        let r = row + dr;
+                        let c = col + dc;
+                        let consecutive = 0;
+                        
+                        while (r >= 0 && r < 15 && c >= 0 && c < 15 && this.board[r][c] === player) {
+                            consecutive++;
+                            r += dr;
+                            c += dc;
+                        }
+                        
+                        count += consecutive;
+                        
+                        // 检查两端是否开放
+                        if (r >= 0 && r < 15 && c >= 0 && c < 15 && this.board[r][c] === null) {
+                            openEnds++;
+                        }
+                    }
+                    
+                    // 根据连子数和开放端数计算分数
+                    if (count >= 5) {
+                        score += 100000; // 五连
+                    } else if (count === 4) {
+                        score += openEnds === 2 ? 10000 : 1000; // 活四或冲四
+                    } else if (count === 3) {
+                        score += openEnds === 2 ? 1000 : 100; // 活三或眠三
+                    } else if (count === 2) {
+                        score += openEnds === 2 ? 100 : 10; // 活二或眠二
+                    }
+                }
+                
+                // 移除临时棋子
+                this.board[row][col] = null;
+                
+                // 中心位置加分
+                const centerDistance = Math.abs(row - 7) + Math.abs(col - 7);
+                score += (14 - centerDistance) * 2;
+                
+                return score;
             }
         }
 
