@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五子棋游戏</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        .current-player {
+            font-weight: bold;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(15, 30px);
+            grid-template-rows: repeat(15, 30px);
+            gap: 0;
+            background-color: #e4b873;
+            border: 2px solid #8b4513;
+            position: relative;
+        }
+
+        .cell {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #8b4513;
+            cursor: pointer;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cell:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .black {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: black;
+        }
+
+        .white {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: white;
+            border: 1px solid #ccc;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .winner-message {
+            margin-top: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+            height: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>五子棋游戏</h1>
+        
+        <div class="game-info">
+            <div class="current-player">当前玩家: <span id="current-player">黑子</span></div>
+            <div>回合数: <span id="turn-count">0</span></div>
+        </div>
+        
+        <div class="board" id="board"></div>
+        
+        <div class="winner-message" id="winner-message"></div>
+        
+        <div class="controls">
+            <button id="restart-btn">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        class Gomoku {
+            constructor() {
+                this.board = Array(15).fill(null).map(() => Array(15).fill(null));
+                this.currentPlayer = 'black';
+                this.gameOver = false;
+                this.turnCount = 0;
+                this.initBoard();
+            }
+
+            initBoard() {
+                const boardElement = document.getElementById('board');
+                boardElement.innerHTML = '';
+                
+                for (let row = 0; row < 15; row++) {
+                    for (let col = 0; col < 15; col++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        cell.dataset.row = row;
+                        cell.dataset.col = col;
+                        cell.addEventListener('click', this.handleCellClick.bind(this));
+                        boardElement.appendChild(cell);
+                    }
+                }
+                
+                this.updateUI();
+            }
+
+            handleCellClick(event) {
+                if (this.gameOver) return;
+                
+                const row = parseInt(event.target.dataset.row);
+                const col = parseInt(event.target.dataset.col);
+                
+                if (this.board[row][col] !== null) return;
+                
+                this.board[row][col] = this.currentPlayer;
+                this.turnCount++;
+                
+                const piece = document.createElement('div');
+                piece.className = this.currentPlayer;
+                event.target.appendChild(piece);
+                
+                if (this.checkWin(row, col)) {
+                    this.gameOver = true;
+                    const winner = this.currentPlayer === 'black' ? '黑子' : '白子';
+                    document.getElementById('winner-message').textContent = `${winner} 获胜！`;
+                } else {
+                    this.currentPlayer = this.currentPlayer === 'black' ? 'white' : 'black';
+                }
+                
+                this.updateUI();
+            }
+
+            checkWin(row, col) {
+                const player = this.board[row][col];
+                
+                // 检查四个方向：水平、垂直、对角线、反对角线
+                const directions = [
+                    [[0, 1], [0, -1]],  // 水平
+                    [[1, 0], [-1, 0]],  // 垂直
+                    [[1, 1], [-1, -1]], // 对角线
+                    [[1, -1], [-1, 1]]  // 反对角线
+                ];
+                
+                for (const direction of directions) {
+                    let count = 1;
+                    
+                    for (const [dr, dc] of direction) {
+                        let r = row + dr;
+                        let c = col + dc;
+                        
+                        while (r >= 0 && r < 15 && c >= 0 && c < 15 && this.board[r][c] === player) {
+                            count++;
+                            r += dr;
+                            c += dc;
+                        }
+                    }
+                    
+                    if (count >= 5) {
+                        return true;
+                    }
+                }
+                
+                return false;
+            }
+
+            updateUI() {
+                const currentPlayerElement = document.getElementById('current-player');
+                const turnCountElement = document.getElementById('turn-count');
+                
+                currentPlayerElement.textContent = this.currentPlayer === 'black' ? '黑子' : '白子';
+                turnCountElement.textContent = this.turnCount;
+            }
+
+            restart() {
+                this.board = Array(15).fill(null).map(() => Array(15).fill(null));
+                this.currentPlayer = 'black';
+                this.gameOver = false;
+                this.turnCount = 0;
+                document.getElementById('winner-message').textContent = '';
+                this.initBoard();
+            }
+        }
+
+        // 初始化游戏
+        const game = new Gomoku();
+        
+        // 重新开始按钮事件
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            game.restart();
+        });
+    </script>
+</body>
+</html>
